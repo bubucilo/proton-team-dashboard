@@ -151,21 +151,55 @@ footer{text-align:center;padding:16px;color:#98a2b3;font-size:12px}
   </table>
 </section>
 
-<footer>Team Task & Productivity Dashboard &mdash; Data synced from team_task_tracker.xlsx &mdash; <span id="footerDate"></span></footer>
+<footer>Team Task & Productivity Dashboard &mdash; Data synced live from Google Sheets &mdash; <span id="footerDate"></span></footer>
 </div>
 
 <script>
 let DATA = [];
 loadData().then(initDashboard).catch(function(e){
-  document.body.innerHTML = '<div style="text-align:center;padding:100px;font-family:sans-serif;color:#DC2626"><h2>Failed to load data</h2><p>'+e.message+'</p><p><small>Run <code>node build.mjs</code> to regenerate data.json</small></p></div>';
+  document.body.innerHTML = '<div style="text-align:center;padding:100px;font-family:sans-serif;color:#DC2626"><h2>Failed to load data</h2><p>'+e.message+'</p></div>';
   console.error(e);
 });
 
+function parseGoogleDate(d){
+  if(!d||!d.trim()) return '';
+  var months={Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+  var p=d.trim().split('-');
+  if(p.length!==3) return '';
+  var m=months[p[1]];
+  return m?'2026-'+m+'-'+p[0].padStart(2,'0'):'';
+}
+
 function loadData(){
-  return fetch("data.json").then(function(r){
-    if(!r.ok) throw new Error("HTTP "+r.status+": "+r.statusText);
-    return r.json();
-  }).then(function(json){ DATA = json; });
+  return fetch("https://docs.google.com/spreadsheets/d/e/2PACX-1vQsPgTQevoGw26TWJKalkeud2H88tgduwqEougbQ9_MvAEkYRq2FdGaAl3gXpbMsw/pub?gid=587513985&single=true&output=csv")
+    .then(function(r){if(!r.ok) throw new Error("HTTP "+r.status+": "+r.statusText); return r.text();})
+    .then(function(csv){
+      var lines=csv.trim().split('\n');
+      var headerIdx=-1;
+      for(var i=0;i<lines.length;i++){if(lines[i].toLowerCase().indexOf('task id')!==-1){headerIdx=i;break;}}
+      if(headerIdx===-1) throw new Error("Header row not found in CSV");
+      var header=lines[headerIdx].split(',').map(function(h){return h.trim().toLowerCase();});
+      DATA=[];
+      for(var i=headerIdx+1;i<lines.length;i++){
+        var cols=lines[i].split(',');
+        var id=String(cols[header.indexOf('task id')]||'').trim();
+        if(!id||!id.toLowerCase().startsWith('tsk')) continue;
+        DATA.push({
+          id:id,
+          name:String(cols[header.indexOf('task name')]||'').trim(),
+          assignee:String(cols[header.indexOf('assigned to')]||'').trim(),
+          brand:String(cols[header.indexOf('brand')]||'').trim(),
+          type:String(cols[header.indexOf('task type')]||'').trim(),
+          priority:String(cols[header.indexOf('priority')]||'').trim(),
+          status:String(cols[header.indexOf('status')]||'').trim(),
+          start:parseGoogleDate(cols[header.indexOf('start date')]||''),
+          deadline:parseGoogleDate(cols[header.indexOf('deadline')]||''),
+          completed:parseGoogleDate(cols[header.indexOf('completion date')]||''),
+          notes:String(cols[header.indexOf('notes')]||'').trim()
+        });
+      }
+      if(!DATA.length) throw new Error("No task rows found in CSV");
+    });
 }
 
 const TODAY = new Date().toISOString().split('T')[0];

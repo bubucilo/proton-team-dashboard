@@ -1,0 +1,8 @@
+node_modules/
+.DS_Store
+Proton Website/
+protonmedia-beautified/
+*.tar.gz
+*.csv
+*.docx
+UGC_*.xlsx

@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Team Task & Productivity Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1" integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f2f5;color:#1a1a2e}
+.dashboard{max-width:1400px;margin:0 auto;padding:24px}
+header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:24px}
+header h1{font-size:24px;color:#1B2A4A;font-weight:700}
+header p{font-size:13px;color:#667085;margin-top:2px}
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.filters select{padding:8px 14px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;color:#344054;background:#fff;cursor:pointer;min-width:150px}
+.filters select:focus{outline:none;border-color:#1B2A4A;box-shadow:0 0 0 3px rgba(27,42,74,0.1)}
+.filters label{font-size:12px;font-weight:600;color:#667085;text-transform:uppercase;letter-spacing:0.5px}
+.filter-group{display:flex;flex-direction:column;gap:4px}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+.kpi{background:#fff;border-radius:12px;padding:20px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.06);border:1px solid #e5e7eb;position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.kpi.total::before{background:#1B2A4A}
+.kpi.completed::before{background:#059669}
+.kpi.progress::before{background:#D97706}
+.kpi.overdue::before{background:#DC2626}
+.kpi.review::before{background:#2563EB}
+.kpi .label{font-size:12px;font-weight:600;color:#667085;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px}
+.kpi .value{font-size:32px;font-weight:700;color:#1B2A4A}
+.kpi .sub{font-size:12px;color:#98a2b3;margin-top:4px}
+
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+.chart-card{background:#fff;border-radius:12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.06);border:1px solid #e5e7eb}
+.chart-card h3{font-size:14px;font-weight:600;color:#1B2A4A;margin-bottom:16px}
+.chart-card canvas{max-height:300px}
+
+.charts-row-2{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:24px}
+
+.table-card{background:#fff;border-radius:12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.06);border:1px solid #e5e7eb;margin-bottom:24px;overflow-x:auto}
+.table-card h3{font-size:14px;font-weight:600;color:#1B2A4A;margin-bottom:16px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#f9fafb;color:#667085;font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:0.5px;padding:10px 12px;text-align:left;border-bottom:2px solid #e5e7eb;cursor:pointer;user-select:none;white-space:nowrap}
+th:hover{background:#f0f2f5}
+th .sort-icon{margin-left:4px;opacity:0.4}
+th.active .sort-icon{opacity:1}
+td{padding:10px 12px;border-bottom:1px solid #f0f2f5;color:#344054}
+tr:hover td{background:#f9fafb}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.badge-completed{background:#d1fae5;color:#065f46}
+.badge-progress{background:#fef3c7;color:#92400e}
+.badge-notstarted{background:#fee2e2;color:#991b1b}
+.badge-review{background:#dbeafe;color:#1e40af}
+.badge-hold{background:#e5e7eb;color:#374151}
+.badge-high{background:#fee2e2;color:#dc2626}
+.badge-medium{background:#fef3c7;color:#d97706}
+.badge-low{background:#d1fae5;color:#059669}
+.overdue-row td{border-left:3px solid #dc2626}
+.deadline-alert{color:#dc2626;font-weight:600;font-size:11px}
+
+.workload-bar{display:flex;align-items:center;gap:8px}
+.bar-track{flex:1;height:20px;background:#f0f2f5;border-radius:10px;overflow:hidden;display:flex}
+.bar-seg{height:100%;transition:width 0.3s}
+.bar-seg.completed{background:#059669}
+.bar-seg.progress{background:#D97706}
+.bar-seg.review{background:#2563EB}
+.bar-seg.notstarted{background:#F87171}
+.bar-seg.hold{background:#9CA3AF}
+.bar-count{font-size:13px;font-weight:600;min-width:30px;text-align:right;color:#1B2A4A}
+
+footer{text-align:center;padding:16px;color:#98a2b3;font-size:12px}
+
+@media(max-width:900px){
+  .charts-row,.charts-row-2{grid-template-columns:1fr}
+  .kpis{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:600px){
+  .kpis{grid-template-columns:1fr}
+  .filters{flex-direction:column;width:100%}
+  .filters select{width:100%}
+}
+</style>
+</head>
+<body>
+<div class="dashboard">
+<header>
+  <div>
+    <h1>Team Task & Productivity Dashboard</h1>
+    <p>Real-time overview of team workload, brand assignments, and deadline tracking</p>
+  </div>
+  <div class="filters">
+    <div class="filter-group">
+      <label>Team Member</label>
+      <select id="filterPerson"><option value="">All Members</option></select>
+    </div>
+    <div class="filter-group">
+      <label>Brand</label>
+      <select id="filterBrand"><option value="">All Brands</option></select>
+    </div>
+    <div class="filter-group">
+      <label>Status</label>
+      <select id="filterStatus"><option value="">All Statuses</option></select>
+    </div>
+    <div class="filter-group">
+      <label>Priority</label>
+      <select id="filterPriority"><option value="">All Priorities</option></select>
+    </div>
+  </div>
+</header>
+
+<section class="kpis">
+  <div class="kpi total"><div class="label">Total Tasks</div><div class="value" id="kpiTotal">0</div><div class="sub" id="kpiTotalSub"></div></div>
+  <div class="kpi completed"><div class="label">Completed</div><div class="value" id="kpiCompleted">0</div><div class="sub" id="kpiCompletedSub"></div></div>
+  <div class="kpi progress"><div class="label">In Progress</div><div class="value" id="kpiProgress">0</div><div class="sub" id="kpiProgressSub"></div></div>
+  <div class="kpi overdue"><div class="label">Overdue</div><div class="value" id="kpiOverdue">0</div><div class="sub" id="kpiOverdueSub">Past deadline & not completed</div></div>
+  <div class="kpi review"><div class="label">In Review</div><div class="value" id="kpiReview">0</div><div class="sub" id="kpiReviewSub"></div></div>
+</section>
+
+<section class="charts-row">
+  <div class="chart-card"><h3>Workload per Team Member</h3><canvas id="chartWorkload"></canvas></div>
+  <div class="chart-card"><h3>Tasks by Brand</h3><canvas id="chartBrand"></canvas></div>
+</section>
+
+<section class="charts-row-2">
+  <div class="chart-card"><h3>Task Status Distribution by Brand</h3><canvas id="chartBrandStatus"></canvas></div>
+  <div class="chart-card"><h3>Priority Breakdown</h3><canvas id="chartPriority"></canvas></div>
+</section>
+
+<section class="table-card">
+  <h3>Team Workload Overview</h3>
+  <table id="workloadTable">
+    <thead><tr><th onclick="sortWorkload('name')">Team Member <span class="sort-icon">↕</span></th><th onclick="sortWorkload('total')">Total <span class="sort-icon">↕</span></th><th onclick="sortWorkload('completed')">Completed <span class="sort-icon">↕</span></th><th style="min-width:250px">Status Breakdown</th><th onclick="sortWorkload('overdue')">Overdue <span class="sort-icon">↕</span></th></tr></thead>
+    <tbody id="workloadBody"></tbody>
+  </table>
+</section>
+
+<section class="table-card">
+  <h3>All Tasks Detail</h3>
+  <table id="taskTable">
+    <thead><tr>
+      <th onclick="sortTasks('id')">ID <span class="sort-icon">↕</span></th>
+      <th onclick="sortTasks('name')">Task <span class="sort-icon">↕</span></th>
+      <th onclick="sortTasks('assignee')">Assigned To <span class="sort-icon">↕</span></th>
+      <th onclick="sortTasks('brand')">Brand <span class="sort-icon">↕</span></th>
+      <th onclick="sortTasks('type')">Type <span class="sort-icon">↕</span></th>
+      <th onclick="sortTasks('priority')">Priority <span class="sort-icon">↕</span></th>
+      <th onclick="sortTasks('status')">Status <span class="sort-icon">↕</span></th>
+      <th onclick="sortTasks('deadline')">Deadline <span class="sort-icon">↕</span></th>
+    </tr></thead>
+    <tbody id="taskBody"></tbody>
+  </table>
+</section>
+
+<footer>Team Task & Productivity Dashboard &mdash; Data synced from team_task_tracker.xlsx &mdash; <span id="footerDate"></span></footer>
+</div>
+
+<script>
+let DATA = [];
+loadData().then(initDashboard).catch(function(e){
+  document.body.innerHTML = '<div style="text-align:center;padding:100px;font-family:sans-serif;color:#DC2626"><h2>Failed to load data</h2><p>'+e.message+'</p><p><small>Run <code>node build.mjs</code> to regenerate data.json</small></p></div>';
+  console.error(e);
+});
+
+function loadData(){
+  return fetch("data.json").then(function(r){
+    if(!r.ok) throw new Error("HTTP "+r.status+": "+r.statusText);
+    return r.json();
+  }).then(function(json){ DATA = json; });
+}
+
+const TODAY = new Date().toISOString().split('T')[0];
+
+// Populate filters
+function populateFilters(){
+  const persons = [...new Set(DATA.map(t=>t.assignee))].sort();
+  const brands = [...new Set(DATA.map(t=>t.brand))].sort();
+  const statuses = [...new Set(DATA.map(t=>t.status))].sort();
+  const priorities = ["High","Medium","Low"];
+  
+  persons.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent=p;document.getElementById('filterPerson').appendChild(o)});
+  brands.forEach(b=>{const o=document.createElement('option');o.value=b;o.textContent=b;document.getElementById('filterBrand').appendChild(o)});
+  statuses.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;document.getElementById('filterStatus').appendChild(o)});
+  priorities.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent=p;document.getElementById('filterPriority').appendChild(o)});
+}
+
+function getFiltered(){
+  let d = DATA;
+  const fp = document.getElementById('filterPerson').value;
+  const fb = document.getElementById('filterBrand').value;
+  const fs = document.getElementById('filterStatus').value;
+  const fpr = document.getElementById('filterPriority').value;
+  if(fp) d = d.filter(t=>t.assignee===fp);
+  if(fb) d = d.filter(t=>t.brand===fb);
+  if(fs) d = d.filter(t=>t.status===fs);
+  if(fpr) d = d.filter(t=>t.priority===fpr);
+  return d;
+}
+
+function isOverdue(t){
+  return t.deadline < TODAY && t.status !== 'Completed';
+}
+
+// KPIs
+function updateKPIs(data){
+  const total = data.length;
+  const completed = data.filter(t=>t.status==='Completed').length;
+  const progress = data.filter(t=>t.status==='In Progress').length;
+  const overdue = data.filter(isOverdue).length;
+  const review = data.filter(t=>t.status==='In Review').length;
+  
+  document.getElementById('kpiTotal').textContent = total;
+  document.getElementById('kpiCompleted').textContent = completed;
+  document.getElementById('kpiProgress').textContent = progress;
+  document.getElementById('kpiOverdue').textContent = overdue;
+  document.getElementById('kpiReview').textContent = review;
+  
+  document.getElementById('kpiTotalSub').textContent = `Across ${new Set(data.map(t=>t.brand)).size} brands`;
+  document.getElementById('kpiCompletedSub').textContent = total ? `${Math.round(completed/total*100)}% completion rate` : '';
+  document.getElementById('kpiProgressSub').textContent = `${progress} active tasks`;
+  document.getElementById('kpiReviewSub').textContent = `Awaiting approval`;
+}
+
+// Charts
+let chartWorkload, chartBrand, chartBrandStatus, chartPriority;
+
+const STATUS_COLORS = {
+  'Completed':'#059669','In Progress':'#D97706','In Review':'#2563EB','Not Started':'#F87171','On Hold':'#9CA3AF'
+};
+const BRAND_COLORS = ['#1B2A4A','#2563EB','#7C3AED','#059669','#D97706','#DC2626','#EC4899'];
+const PRIORITY_COLORS_MAP = {'High':'#DC2626','Medium':'#D97706','Low':'#059669'};
+
+function updateCharts(data){
+  // Workload per person
+  const persons = [...new Set(DATA.map(t=>t.assignee))].sort();
+  const personCounts = persons.map(p=>data.filter(t=>t.assignee===p).length);
+  const personOverdue = persons.map(p=>data.filter(t=>t.assignee===p && isOverdue(t)).length);
+  
+  if(chartWorkload) chartWorkload.destroy();
+  chartWorkload = new Chart(document.getElementById('chartWorkload'),{
+    type:'bar',
+    data:{
+      labels:persons.map(p=>p.split(' ')[0]),
+      datasets:[
+        {label:'Tasks',data:personCounts,backgroundColor:'#1B2A4A',borderRadius:6,barPercentage:0.7},
+        {label:'Overdue',data:personOverdue,backgroundColor:'#DC2626',borderRadius:6,barPercentage:0.7}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{position:'bottom',labels:{boxWidth:12,padding:16,font:{size:11}}}},scales:{y:{beginAtZero:true,ticks:{stepSize:1,font:{size:11}}},x:{ticks:{font:{size:10}}}}}
+  });
+
+  // Tasks by brand (doughnut)
+  const brands = [...new Set(DATA.map(t=>t.brand))].sort();
+  const brandCounts = brands.map(b=>data.filter(t=>t.brand===b).length);
+  
+  if(chartBrand) chartBrand.destroy();
+  chartBrand = new Chart(document.getElementById('chartBrand'),{
+    type:'doughnut',
+    data:{
+      labels:brands,
+      datasets:[{data:brandCounts,backgroundColor:BRAND_COLORS.slice(0,brands.length),borderWidth:2,borderColor:'#fff'}]
+    },
+    options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{position:'bottom',labels:{boxWidth:12,padding:12,font:{size:11}}}}}
+  });
+
+  // Brand x Status stacked bar
+  const allStatuses = ['Completed','In Progress','In Review','Not Started','On Hold'];
+  const brandStatusDatasets = allStatuses.map(s=>({
+    label:s,
+    data:brands.map(b=>data.filter(t=>t.brand===b && t.status===s).length),
+    backgroundColor:STATUS_COLORS[s],
+    borderRadius:3
+  }));
+  
+  if(chartBrandStatus) chartBrandStatus.destroy();
+  chartBrandStatus = new Chart(document.getElementById('chartBrandStatus'),{
+    type:'bar',
+    data:{labels:brands.map(b=>b.replace('Brand ','')),datasets:brandStatusDatasets},
+    options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{position:'bottom',labels:{boxWidth:12,padding:12,font:{size:11}}}},scales:{x:{stacked:true,ticks:{font:{size:11}}},y:{stacked:true,beginAtZero:true,ticks:{stepSize:1,font:{size:11}}}}}
+  });
+
+  // Priority doughnut
+  const pris = ['High','Medium','Low'];
+  const priCounts = pris.map(p=>data.filter(t=>t.priority===p).length);
+  
+  if(chartPriority) chartPriority.destroy();
+  chartPriority = new Chart(document.getElementById('chartPriority'),{
+    type:'doughnut',
+    data:{
+      labels:pris,
+      datasets:[{data:priCounts,backgroundColor:[PRIORITY_COLORS_MAP.High,PRIORITY_COLORS_MAP.Medium,PRIORITY_COLORS_MAP.Low],borderWidth:2,borderColor:'#fff'}]
+    },
+    options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{position:'bottom',labels:{boxWidth:12,padding:12,font:{size:11}}}}}
+  });
+}
+
+// Workload table
+let workloadSortKey='total', workloadSortAsc=false;
+function sortWorkload(key){
+  if(workloadSortKey===key) workloadSortAsc=!workloadSortAsc;
+  else{workloadSortKey=key;workloadSortAsc=key==='name'}
+  applyFilters();
+}
+
+function updateWorkloadTable(data){
+  const persons = [...new Set(DATA.map(t=>t.assignee))].sort();
+  let rows = persons.map(p=>{
+    const tasks = data.filter(t=>t.assignee===p);
+    return {
+      name:p,
+      total:tasks.length,
+      completed:tasks.filter(t=>t.status==='Completed').length,
+      progress:tasks.filter(t=>t.status==='In Progress').length,
+      review:tasks.filter(t=>t.status==='In Review').length,
+      notstarted:tasks.filter(t=>t.status==='Not Started').length,
+      hold:tasks.filter(t=>t.status==='On Hold').length,
+      overdue:tasks.filter(isOverdue).length
+    };
+  }).filter(r=>r.total>0);
+
+  rows.sort((a,b)=>{
+    let va=a[workloadSortKey],vb=b[workloadSortKey];
+    if(typeof va==='string') return workloadSortAsc?va.localeCompare(vb):vb.localeCompare(va);
+    return workloadSortAsc?va-vb:vb-va;
+  });
+
+  const tbody = document.getElementById('workloadBody');
+  tbody.innerHTML = rows.map(r=>{
+    const max = r.total || 1;
+    return `<tr>
+      <td style="font-weight:600">${r.name}</td>
+      <td style="font-weight:700;font-size:15px">${r.total}</td>
+      <td>${r.completed}</td>
+      <td><div class="workload-bar">
+        <div class="bar-track">
+          <div class="bar-seg completed" style="width:${r.completed/max*100}%" title="Completed: ${r.completed}"></div>
+          <div class="bar-seg progress" style="width:${r.progress/max*100}%" title="In Progress: ${r.progress}"></div>
+          <div class="bar-seg review" style="width:${r.review/max*100}%" title="In Review: ${r.review}"></div>
+          <div class="bar-seg notstarted" style="width:${r.notstarted/max*100}%" title="Not Started: ${r.notstarted}"></div>
+          <div class="bar-seg hold" style="width:${r.hold/max*100}%" title="On Hold: ${r.hold}"></div>
+        </div>
+      </div></td>
+      <td>${r.overdue ? '<span class="deadline-alert">⚠ '+r.overdue+'</span>' : '<span style="color:#059669">0</span>'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// Task table
+let taskSortKey='deadline', taskSortAsc=true;
+function sortTasks(key){
+  if(taskSortKey===key) taskSortAsc=!taskSortAsc;
+  else{taskSortKey=key;taskSortAsc=true}
+  applyFilters();
+}
+
+function statusBadge(s){
+  const cls = {'Completed':'completed','In Progress':'progress','Not Started':'notstarted','In Review':'review','On Hold':'hold'}[s]||'hold';
+  return `<span class="badge badge-${cls}">${s}</span>`;
+}
+function priorityBadge(p){
+  const cls = {'High':'high','Medium':'medium','Low':'low'}[p]||'low';
+  return `<span class="badge badge-${cls}">${p}</span>`;
+}
+function fmtDate(d){
+  if(!d) return '';
+  const dt = new Date(d+'T00:00:00');
+  return dt.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+}
+
+function updateTaskTable(data){
+  let sorted = [...data];
+  sorted.sort((a,b)=>{
+    let va=a[taskSortKey]||'',vb=b[taskSortKey]||'';
+    if(taskSortKey==='priority'){
+      const ord={'High':0,'Medium':1,'Low':2};
+      va=ord[va]??1;vb=ord[vb]??1;
+      return taskSortAsc?va-vb:vb-va;
+    }
+    if(typeof va==='string') return taskSortAsc?va.localeCompare(vb):vb.localeCompare(va);
+    return taskSortAsc?va-vb:vb-va;
+  });
+
+  const tbody = document.getElementById('taskBody');
+  tbody.innerHTML = sorted.map(t=>{
+    const overdue = isOverdue(t);
+    const deadlineDisplay = fmtDate(t.deadline) + (overdue ? ' <span class="deadline-alert">OVERDUE</span>' : '');
+    return `<tr class="${overdue?'overdue-row':''}">
+      <td style="color:#667085;font-size:12px">${t.id}</td>
+      <td style="font-weight:500;max-width:250px">${t.name}</td>
+      <td>${t.assignee}</td>
+      <td>${t.brand}</td>
+      <td style="font-size:12px">${t.type}</td>
+      <td>${priorityBadge(t.priority)}</td>
+      <td>${statusBadge(t.status)}</td>
+      <td style="white-space:nowrap">${deadlineDisplay}</td>
+    </tr>`;
+  }).join('');
+}
+
+// Master filter
+function applyFilters(){
+  const data = getFiltered();
+  updateKPIs(data);
+  updateCharts(data);
+  updateWorkloadTable(data);
+  updateTaskTable(data);
+}
+
+// Init
+function initDashboard(){
+  populateFilters();
+  applyFilters();
+  document.querySelectorAll('.filters select').forEach(el=>el.addEventListener('change',applyFilters));
+  const dt = new Date();
+  document.getElementById('footerDate').textContent = 'Last updated: ' + dt.toISOString().split('T')[0] + ' ' + dt.toTimeString().split(' ')[0].slice(0,5);
+}
+</script>
+</body>
+</html>
